@@ -1,21 +1,36 @@
 # For info on getting the latest rdme version and obtaining your API_DEFINITION_ID,
 # see our docs: https://docs.readme.com/docs/rdme#example-syncing-an-openapi-definition
 name: Sync Changelog to ReadMe
-on:
+on: 
   release:
     types: [published]
 
 jobs:
-  build:
+  get-notes:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
+      - name: Check out code
         uses: actions/checkout@v3
 
       - name: Get release notes
         run: |
           RELEASE_ID=$(jq --raw-output .release.id "$GITHUB_EVENT_PATH")
           curl -sSL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > release.json
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > release.json
           RELEASE_NOTES=$(jq --raw-output .body release.json)
-          echo "Release notes: $RELEASE_NOTES"
+          RELEASE_TITLE=$(jq --raw-output .name release.json)
+          cat << EOF > RELEASE_NOTES.md
+          ---
+          title: $RELEASE_TITLE
+          ---
+
+          $RELEASE_NOTES
+          EOF
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add RELEASE_NOTES.md
+          git commit -m "Update release notes" -a
+          git push
